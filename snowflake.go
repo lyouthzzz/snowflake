@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+type ID int64
+
 type Node struct {
 	workerId           int64
 	workerIdBits       int64
@@ -69,13 +71,13 @@ func NewNode(opts ...Option) *Node {
 	return n
 }
 
-func (n *Node) NextId() (int64, error) {
+func (n *Node) NextId() (ID, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
 	timestamp := time.Now().UTC().UnixNano() / 1e6
 	if timestamp < n.lastTimestamp {
-		return 0, fmt.Errorf("clock moved backwards.  refusing to generate id for %d milliseconds", n.lastTimestamp-timestamp)
+		return ID(0), fmt.Errorf("clock moved backwards.  refusing to generate id for %d milliseconds", n.lastTimestamp-timestamp)
 	}
 	n.sequence = (n.sequence + 1) & n.sequenceMask
 	if n.sequence == 0 {
@@ -83,7 +85,12 @@ func (n *Node) NextId() (int64, error) {
 	}
 	n.lastTimestamp = timestamp
 
-	return ((n.lastTimestamp - n.startTimestamp) << n.timestampLeftShift) | (n.dataCenterId << n.dataCenterIdShift) | (n.workerId << n.workerIdShift) | n.sequence, nil
+	l := ((n.lastTimestamp - n.startTimestamp) << n.timestampLeftShift) | (n.dataCenterId << n.dataCenterIdShift) | (n.workerId << n.workerIdShift) | n.sequence
+	id, err := ParseInt(l)
+	if err != nil {
+		return ID(0), err
+	}
+	return id, nil
 }
 
 func (n *Node) tillNextMillis(lastTimestamp int64) int64 {
@@ -120,4 +127,24 @@ func (n *Node) init() error {
 		n.workerId, n.dataCenterId = 0, 0
 	}
 	return nil
+}
+
+func (id ID) Int64() int64 {
+	return int64(id)
+}
+
+func (id ID) String() string {
+	return strconv.FormatInt(id.Int64(), 10)
+}
+
+func ParseInt(i int64) (ID, error) {
+	return ID(i), nil
+}
+
+func ParseString(s string) (ID, error) {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return ID(0), err
+	}
+	return ID(i), nil
 }

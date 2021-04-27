@@ -29,7 +29,7 @@ func TestSnowFlake(t *testing.T) {
 				fmt.Println(id)
 
 				mu.Lock()
-				if _, exist := idMap[id]; exist {
+				if _, exist := idMap[id.Int64()]; exist {
 					t.Error(errors.New("duplicate id"))
 				}
 				mu.Unlock()
